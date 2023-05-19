@@ -1,9 +1,9 @@
 from distutils.core import setup
 
 setup(
-name="FGMultiSource",
+name="Transfer Classifier",
 version="1.0",
-description="multi-source experiment",
+description="using fg-net finetuning to classify Cifar10",
 author="viki",
-py_modules=["formula_test.fixed_f_vanilla","formula_test.loading"]
+py_modules=["trainer.train_s","trainer.transfer"]
 )

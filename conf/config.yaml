@@ -1,6 +1,5 @@
 path:
-  wd: "/home/viki/Codes/MultiSource/3/multi_source_exp/MultiSourceExp/"
-  data: "/home/viki/Codes/MultiSource/2/multi-source/data_set_2/"
+  wd: "/home/viki/Codes/MultiSource/3/multi_source_exp/TransferClassifier/"
 
 setting:
   device: "cuda"
