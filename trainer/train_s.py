@@ -11,6 +11,7 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 import numpy as np
 from torch.autograd import Variable
+import time
 
 
 
@@ -18,6 +19,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
 PATH = "/home/viki/Codes/MultiSource/3/multi_source_exp/TransferClassifier/"
+
 
 
 class Net_f(nn.Module):
@@ -55,10 +57,10 @@ def load_data_all(batch_size=100):
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
     trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)
 
     testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=True)
 
     classes = ('plane', 'car', 'bird', 'cat',
             'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
@@ -91,6 +93,8 @@ class train_all():
 
     def train(self, num_epochs = 20, lr = 0.0001, print_loss=True) -> None:
 
+        start = time.time()
+
         self.model_f.train()
         self.model_g.train()
 
@@ -98,25 +102,52 @@ class train_all():
 
         total_step = len(self.train_loader)
 
+        # mse_loss = nn.MSELoss()
+        checkpoint1 = time.time()
+        print('Time init for training: {}'.format(checkpoint1 - start))
+
         for epoch in range(num_epochs):
+
+            local0 = time.time()
 
             for i, (images, labels) in enumerate(self.train_loader):
                 
+                local1 = time.time()
+                print('Time for get data: {}'.format(local1 - local0))
+                
+
                 labels_one_hot = torch.zeros(len(labels), self.num_class).scatter_(1, labels.view(-1,1), 1)
 
+                local2 = time.time()
+                print('Time for one hot: {}'.format(local2 - local1))
+
+                # images, labels_one_hot = images.to(device), labels_one_hot.to(device)
                 # Forward pass
                 optimizer_fg.zero_grad()
                 f = self.model_f(Variable(images).to(device))
                 g = self.model_g(Variable(labels_one_hot).to(device))
+                
+                local3 = time.time()
+                print('Time for forward: {}'.format(local3 - local2))
 
                 loss = (-2)*self.corr(f,g) + 2*((torch.sum(f,0)/f.size()[0])*(torch.sum(g,0)/g.size()[0])).sum() + self.cov_trace(f,g)
+                # loss = mse_loss(f, g)
+
+                loss.to(device)
+
+                local4 = time.time()
+                print('Time for loss: {}'.format(local4 - local3))
 
                 loss.backward()
 
                 optimizer_fg.step()
+                local5 = time.time()
+                print('Time for backward: {}'.format(local5 - local4))
                 
                 if print_loss and (i+1) % 100 == 0:
                     print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}' .format(epoch+1, num_epochs, i+1, total_step, loss.item()))
+
+                local0 = time.time()
 
         print('Finished Training')
 
@@ -168,7 +199,7 @@ class train_all():
 
 if __name__ == '__main__':
     # id = sys.argv[1]
-    batch_size = 12
+    batch_size = 100
     num_epochs = 20
     lr = 0.0001
     num_class = 10
