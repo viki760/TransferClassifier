@@ -72,19 +72,19 @@ class train_all():
     def __init__(self, path = PATH, all=True, batch_size=100):
 
         self.num_class = 10 if all else 2
-        self.train_loader, self.test_loader = self.load_data(batch_size=batch_size)
+        self.train_loader, self.test_loader, self.classes = self.load_data(batch_size=batch_size)
         self.model_f = Net_f().to(device)
         self.model_g = Net_g(num_class = num_class).to(device)
         self.path = path
 
-    def load_data(batch_size):
+    def load_data(self, batch_size):
         return load_data_all(batch_size=batch_size)
     
-    def corr(f,g):
+    def corr(self, f, g):
         k = torch.mean(torch.sum(f*g,1))
         return k
         
-    def cov_trace(f,g):
+    def cov_trace(self, f, g):
         cov_f = torch.mm(torch.t(f),f) / (f.size()[0]-1.)
         cov_g = torch.mm(torch.t(g),g) / (g.size()[0]-1.)
         return torch.trace(torch.mm(cov_f, cov_g))

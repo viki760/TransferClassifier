@@ -67,5 +67,3 @@ class classify(train_all):
         
         return acc
     
-
-
