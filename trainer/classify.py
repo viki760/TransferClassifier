@@ -30,40 +30,48 @@ print(device)
 class classify(train_all):
     def __init__(self):
         super(classify, self).__init__(path = PATH, all=False, batch_size=100)
+        self.s_model_list = [self.load_model(i) for i in range(10)]
+
+    def load_model(self, id):
+        model_f = self.model_f.load_state_dict(torch.load(self.path+'model/f_task_transfer'+str(id)+'.pth', map_location=device))
+        model_g = self.model_g.load_state_dict(torch.load(self.path+'model/g_task_transfer'+str(id)+'.pth', map_location=device))
+        return [model_f, model_g]     
     
-    def get_ith_prediction(self, id):
-        self.model_f.load_state_dict(torch.load(self.path+'model/f_task_transfer'+str(id)+'.pth', map_location=device))
-        self.model_g.load_state_dict(torch.load(self.path+'model/g_task_transfer'+str(id)+'.pth', map_location=device))
-        
-        print('id = '+str(id))
-        pred_i = self.test_model()
-        return pred_i
-    
-    def test_model(self):
+    def get_single_predict(self, model_f, model_g, image):
         # Test the model
-        self.model_f.eval()
-        self.model_g.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
+        model_f.eval()
+        model_g.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
         with torch.no_grad():
-            acc = 0
-            total = 0
-
-            for images, labels in self.test_loader:
-
-                labels = labels.numpy()
-                fc = self.model_f(Variable(images).to(device)).data.cpu().numpy()
-                f_mean = np.sum(fc,axis = 0) / fc.shape[0]
-                fcp = fc - f_mean
-                
-                labellist = torch.eye(self.num_class)
-                gc = self.model_g(Variable(labellist).to(device)).data.cpu().numpy()
-                gce = np.sum(gc,axis = 0) / gc.shape[0]
-                gcp = gc - gce
-                fgp = np.dot(fcp, gcp.T)
-                acc += (np.argmax(fgp, axis = 1) == labels).sum()
-                total += len(images)
-
-            acc = float(acc) / total
-            print('Test Accuracy of the model on the 1000 test images: {} %'.format(100 * acc))
-        
-        return acc
+            
+            fc = model_f(Variable(images).to(device)).data.cpu().numpy()
+            f_mean = np.sum(fc,axis = 0) / fc.shape[0]
+            fcp = fc - f_mean
+            
+            labellist = torch.eye(2)
+            gc = model_g(Variable(labellist).to(device)).data.cpu().numpy()
+            gce = np.sum(gc,axis = 0) / gc.shape[0]
+            gcp = gc - gce
+            fgp = np.dot(fcp, gcp.T)
+            pred = np.argmax(fgp, axis = 1)
+              
+        return pred, fgp
     
+    def get_pred(self, sample, label=None):
+
+        image = sample.unsqueeze(0) # (3, 224, 224) -> (1, 3, 224, 224)
+
+        with torch.no_grad():
+
+            res_all = []
+            for f, g in self.s_model_list:
+
+                _, res = get_single_predict(f, g, image)
+                res = res[0] / res[1]
+                res_all.append(res)
+
+            pred = np.argmax(np.array(res_all))
+
+        
+        istrue = pred == label if label != None else None
+        
+        return pred, istrue
